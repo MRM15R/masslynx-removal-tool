@@ -1,0 +1,14 @@
+# Windows / PowerShell
+*.log
+*.tmp
+Thumbs.db
+desktop.ini
+
+# Local test output
+Logs/
+backup/
+*.bak-*
+
+# Editors
+.vscode/
+.idea/
