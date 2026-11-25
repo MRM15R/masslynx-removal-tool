@@ -119,7 +119,7 @@ function Get-StageFolder {
 }
 
 function Test-Payload {
-    param([string]$Path, [string]$StageDir)
+    param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { throw "Het script staat niet op $Path" }
     $size = (Get-Item -LiteralPath $Path).Length
     if ($size -lt 20000) { throw "Het script is te klein ($size bytes) - waarschijnlijk niet goed gedownload." }
@@ -145,14 +145,28 @@ try {
     Say ''
 
     $bron = Get-SourceFile
-    Say ("Bron    : " + $bron) 'DarkGray'
 
-    $doelMap = Get-StageFolder
-    $script:Staged = Join-Path $doelMap $payload
-    Copy-Item -LiteralPath $bron -Destination $script:Staged -Force
-    Say ("Kopie   : " + $script:Staged) 'DarkGray'
+    # Kopieren is alleen nodig als er nog verhoogd moet worden: Windows start het
+    # verhoogde proces dan met het account dat de beheerder invult, en dat account
+    # kan niet in het profiel (of de OneDrive) van de ingelogde gebruiker kijken.
+    # Draait dit al als beheerder, dan start het script waar het staat.
+    $needsStage = (-not (Test-Admin)) -and (-not $NoElevate)
 
-    $versie = Test-Payload -Path $script:Staged -StageDir $doelMap
+    if ($needsStage -or $StageOnly) {
+        Say ("Bron    : " + $bron) 'DarkGray'
+        $doelMap = Get-StageFolder
+        $script:Staged = Join-Path $doelMap $payload
+        Copy-Item -LiteralPath $bron -Destination $script:Staged -Force
+        Say ("Kopie   : " + $script:Staged) 'DarkGray'
+        Say '          (nodig: het verhoogde proces draait als het account dat u bij' 'DarkGray'
+        Say '           de Windows-vraag invult, en dat kan dit profiel niet lezen)' 'DarkGray'
+        $doel = $script:Staged
+    } else {
+        Say ("Script  : " + $bron) 'DarkGray'
+        $doel = $bron
+    }
+
+    $versie = Test-Payload -Path $doel
     Say ("Versie  : " + $versie + "  (controle ok)") 'Green'
 
     if ($StageOnly) {
@@ -162,7 +176,7 @@ try {
     }
 
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
-                 '-File', ('"' + $script:Staged + '"'), '-Action', $Action)
+                 '-File', ('"' + $doel + '"'), '-Action', $Action)
     if ($Media) { $argList += @('-Media', ('"' + $Media + '"')) }
 
     if ((Test-Admin) -or $NoElevate) {
